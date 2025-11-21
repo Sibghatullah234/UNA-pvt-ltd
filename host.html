@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Admin — Ultra Nitro Orders</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #ffffff;
+      color: #000;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .order {
+      border: 1px solid #ccc;
+      background: #fafafa;
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+    }
+
+    select, button {
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-top: 10px;
+      border: 1px solid #aaa;
+      cursor: pointer;
+    }
+
+    .status-box {
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Ultra Nitro Admin — Order Manager</h1>
+
+<div id="orders">Loading orders...</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDOlYis-cCQoYZB8G7gCHvy94ehBrGCRTk",
+    authDomain: "sibghatullah-bookstore.firebaseapp.com",
+    databaseURL: "https://sibghatullah-bookstore-default-rtdb.firebaseio.com",
+    projectId: "sibghatullah-bookstore",
+    storageBucket: "sibghatullah-bookstore.firebasestorage.app",
+    messagingSenderId: "526470929282",
+    appId: "1:526470929282:web:95a13ec9bdcdc50f984d9b",
+    measurementId: "G-M43L97GRGM"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  const ordersBox = document.getElementById("orders");
+
+  onValue(ref(db, "orders"), snap => {
+    let data = snap.val();
+
+    if (!data) {
+      ordersBox.innerHTML = "No orders found.";
+      return;
+    }
+
+    ordersBox.innerHTML = "";
+
+    Object.entries(data).reverse().forEach(([id, o]) => {
+      if (!o) return;
+
+      let div = document.createElement("div");
+      div.className = "order";
+
+      div.innerHTML = `
+        <strong>${o.book}</strong> — ₹${o.price}<br>
+        Qty: ${o.qty || 1}<br><br>
+
+        <b>Customer:</b> ${o.name}<br>
+        <b>Phone:</b> ${o.phone}<br>
+        <b>Address:</b> ${o.address}<br><br>
+
+        <b>Date:</b> ${o.date}<br>
+        <div class="status-box">
+          <b>Status:</b>
+          <select data-id="${id}">
+            <option ${o.status === "Pending" ? "selected" : ""}>Pending</option>
+            <option ${o.status === "Shipped" ? "selected" : ""}>Shipped</option>
+            <option ${o.status === "Delivered" ? "selected" : ""}>Delivered</option>
+          </select>
+
+          <button data-id="${id}">Update</button>
+        </div>
+      `;
+
+      ordersBox.appendChild(div);
+    });
+
+    ordersBox.querySelectorAll("button").forEach(btn => {
+      btn.onclick = () => {
+        let id = btn.dataset.id;
+        let select = btn.parentElement.querySelector("select");
+        let newStatus = select.value;
+
+        update(ref(db, "orders/" + id), { status: newStatus });
+
+        alert("Status updated to " + newStatus);
+      };
+    });
+  });
+</script>
+
+</body>
+</html>
