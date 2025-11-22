@@ -3,40 +3,66 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Admin — Ultra Nitro Orders</title>
+  <title>Ultra Nitro Admin</title>
 
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #ffffff;
-      color: #000;
+      background: #f0f2f5;
       margin: 0;
       padding: 20px;
     }
 
     h1 {
       text-align: center;
+      margin-bottom: 15px;
+    }
+
+    .top-controls {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
       margin-bottom: 20px;
     }
 
-    .order {
-      border: 1px solid #ccc;
-      background: #fafafa;
-      padding: 15px;
-      border-radius: 10px;
-      margin-bottom: 12px;
+    input, select, button {
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #aaa;
+      font-size: 15px;
     }
 
-    select, button {
-      padding: 8px 12px;
-      border-radius: 6px;
-      margin-top: 10px;
-      border: 1px solid #aaa;
+    button {
       cursor: pointer;
+      background: #007bff;
+      color: white;
+      border: none;
+    }
+
+    button:hover {
+      opacity: 0.9;
+    }
+
+    #downloadBtn {
+      background: #28a745;
+    }
+
+    .order {
+      background: white;
+      border-radius: 10px;
+      padding: 15px;
+      margin-bottom: 12px;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.1);
     }
 
     .status-box {
       margin-top: 10px;
+    }
+
+    .remove-btn {
+      background: #ff3b3b;
+      color: white;
+      margin-left: 8px;
     }
   </style>
 </head>
@@ -44,11 +70,22 @@
 
 <h1>Ultra Nitro Admin — Order Manager</h1>
 
+<div class="top-controls">
+  <input type="text" id="searchBox" placeholder="Search orders...">
+  <select id="filterBox">
+    <option value="All">All</option>
+    <option value="Pending">Pending</option>
+    <option value="Shipped">Shipped</option>
+    <option value="Delivered">Delivered</option>
+  </select>
+  <button id="downloadBtn">Download CSV</button>
+</div>
+
 <div id="orders">Loading orders...</div>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-  import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+  import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDOlYis-cCQoYZB8G7gCHvy94ehBrGCRTk",
@@ -65,19 +102,27 @@
   const db = getDatabase(app);
 
   const ordersBox = document.getElementById("orders");
+  const searchBox = document.getElementById("searchBox");
+  const filterBox = document.getElementById("filterBox");
+  const downloadBtn = document.getElementById("downloadBtn");
 
-  onValue(ref(db, "orders"), snap => {
-    let data = snap.val();
+  let allOrders = {};
 
-    if (!data) {
-      ordersBox.innerHTML = "No orders found.";
-      return;
-    }
+  function renderOrders() {
+    let search = searchBox.value.toLowerCase();
+    let filter = filterBox.value;
 
     ordersBox.innerHTML = "";
 
-    Object.entries(data).reverse().forEach(([id, o]) => {
+    let entries = Object.entries(allOrders).reverse();
+
+    entries.forEach(([id, o]) => {
       if (!o) return;
+
+      let full = `${o.book} ${o.name} ${o.phone} ${id}`.toLowerCase();
+      if (!full.includes(search)) return;
+
+      if (filter !== "All" && o.status !== filter) return;
 
       let div = document.createElement("div");
       div.className = "order";
@@ -99,25 +144,60 @@
             <option ${o.status === "Delivered" ? "selected" : ""}>Delivered</option>
           </select>
 
-          <button data-id="${id}">Update</button>
+          <button class="update-btn" data-id="${id}">Update</button>
+          <button class="remove-btn" data-id="${id}">Remove</button>
         </div>
       `;
 
       ordersBox.appendChild(div);
     });
 
-    ordersBox.querySelectorAll("button").forEach(btn => {
+    addButtonEvents();
+  }
+
+  function addButtonEvents() {
+    document.querySelectorAll(".update-btn").forEach(btn => {
       btn.onclick = () => {
         let id = btn.dataset.id;
         let select = btn.parentElement.querySelector("select");
-        let newStatus = select.value;
-
-        update(ref(db, "orders/" + id), { status: newStatus });
-
-        alert("Status updated to " + newStatus);
+        update(ref(db, "orders/" + id), { status: select.value });
+        alert("Status updated!");
       };
     });
+
+    document.querySelectorAll(".remove-btn").forEach(btn => {
+      btn.onclick = () => {
+        let id = btn.dataset.id;
+        if (confirm("Delete this order?")) remove(ref(db, "orders/" + id));
+      };
+    });
+  }
+
+  onValue(ref(db, "orders"), snap => {
+    allOrders = snap.val() || {};
+    renderOrders();
   });
+
+  searchBox.oninput = renderOrders;
+  filterBox.onchange = renderOrders;
+
+  // CSV Download
+  downloadBtn.onclick = function () {
+    let rows = [["ID", "Book", "Price", "Qty", "Name", "Phone", "Address", "Date", "Status"]];
+
+    Object.entries(allOrders).forEach(([id, o]) => {
+      rows.push([id, o.book, o.price, o.qty, o.name, o.phone, o.address, o.date, o.status]);
+    });
+
+    let csv = rows.map(e => e.join(",")).join("\n");
+    let blob = new Blob([csv], { type: "text/csv" });
+    let url = URL.createObjectURL(blob);
+
+    let a = document.createElement("a");
+    a.href = url;
+    a.download = "orders.csv";
+    a.click();
+  };
 </script>
 
 </body>
